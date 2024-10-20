@@ -62,7 +62,7 @@ HTTPS (Local Development):
 To run the app locally with HTTPS, you need to generate self-signed certificates. One way to do this is using OpenSSL:
 ```
 openssl req -x509 -newkey rsa:4096 -nodes -out cert.pem -keyout key.pem -days 365
-content_copy
+
 ```
 
 
