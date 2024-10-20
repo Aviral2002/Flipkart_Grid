@@ -1,4 +1,4 @@
-# Freshness Index for Flipkart Grid Robotics Track
+# Flipkart Grid Robotics Track
 
 ## Create a new environment
 
