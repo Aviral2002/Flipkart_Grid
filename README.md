@@ -22,20 +22,18 @@ Use code with caution.
 Markdown
 
 Create a Virtual Environment (Recommended):
-
+```
 python -m venv env
 env\Scripts\activate  (Windows)
 source env/bin/activate (macOS/Linux)
-content_copy
+
+```
 Use code with caution.
-Bash
 
 Install Dependencies:
-
+```
 pip install -r requirements.txt
-content_copy
-Use code with caution.
-Bash
+```
 
 Install Tesseract OCR:
 
@@ -53,21 +51,20 @@ Download the 'imageclassifier.h5' model file and place it in the project's root 
 Usage Examples
 
 Running the Application:
-
+```
 python app.py
-content_copy
-Use code with caution.
-Bash
+```
+
 
 This will start the Flask development server. Open your web browser and navigate to https://127.0.0.1:5000 (or the URL shown in your terminal). Note that the web app uses https, which is addressed in the next section.
 
 HTTPS (Local Development):
 To run the app locally with HTTPS, you need to generate self-signed certificates. One way to do this is using OpenSSL:
-
+```
 openssl req -x509 -newkey rsa:4096 -nodes -out cert.pem -keyout key.pem -days 365
 content_copy
-Use code with caution.
-Bash
+```
+
 
 When prompted for information about your certificate, you can enter dummy values as this is for local development only. Make sure these cert.pem and key.pem files are in the same directory as app.py.
 Modify the filenames in app.py if necessary.
@@ -105,8 +102,7 @@ Use code with caution.
 
 requirements.txt
 
-content_copy
-Use code with caution.
+```
 
 tensorflow==2.17.0
 Flask==2.3.3
@@ -118,6 +114,8 @@ Pillow==10.1.0
 pytesseract==0.3.12
 eventlet==0.33.3
 python-dotenv==1.0.0
+
+```
 
 Key changes and explanations:
 
