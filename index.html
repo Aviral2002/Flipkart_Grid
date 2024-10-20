@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Freshness Detection, OCR, Brand Recognition & Counting</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.3.2/socket.io.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            overflow-y: scroll;
+        }
+
+        h1 {
+            text-align: center;
+            margin-top: 20px;
+            font-size: 24px;
+        }
+
+        #controls {
+            display: flex;
+            justify-content: center;
+            margin-bottom: 20px;
+        }
+
+        label, select {
+            font-size: 18px;
+            margin-right: 10px;
+        }
+
+        #drop-zone {
+            width: 300px;
+            height: 200px;
+            border: 2px dashed #ccc;
+            border-radius: 5px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            margin: 20px auto;
+            padding: 10px;
+            background-color: #f8f8f8;
+            cursor: pointer;
+        }
+
+        #drop-zone.hover {
+            border-color: #66b3ff;
+        }
+
+        #video-container {
+            display: flex;
+            justify-content: center;
+            margin-bottom: 20px;
+        }
+
+        #video {
+            max-width: 100%;
+            height: auto;
+            border: 2px solid #333;
+        }
+
+        #actions {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        #capture {
+            padding: 10px 20px;
+            font-size: 16px;
+            background-color: #28a745;
+            color: white;
+            border: none;
+            cursor: pointer;
+        }
+
+        #capture:hover {
+            background-color: #218838;
+        }
+
+        #toggle-camera, #switch-camera {
+            padding: 10px 20px;
+            font-size: 16px;
+            margin-top: 10px;
+            background-color: #ff6600;
+            color: white;
+            border: none;
+            cursor: pointer;
+        }
+
+        #toggle-camera:hover, #switch-camera:hover {
+            background-color: #e65c00;
+        }
+
+        #result {
+            max-height: 300px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            margin: 20px auto;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            background-color: #f0f0f0;
+        }
+    </style>
+</head>
+<body>
+    <h1>Freshness Detection, OCR, Brand Recognition & Counting</h1>
+
+    <div id="controls">
+        <label for="task">Select Task:</label>
+        <select id="task">
+            <option value="classify">Classify (Fresh/Rotten)</option>
+            <option value="ocr">OCR (Extract Product Details)</option>
+            <option value="brand">Brand Recognition and Counting</option>
+        </select>
+    </div>
+
+    <div id="drop-zone">Drag and drop an image here or click to upload</div>
+    <input type="file" id="file-input" accept="image/*" style="display: none;" />
+
+    <div id="video-container">
+        <video id="video" autoplay></video>
+    </div>
+
+    <div id="actions">
+        <button id="capture">Capture and Submit</button>
+        <button id="toggle-camera">Turn Camera Off</button>
+        <button id="switch-camera">Switch to Front Camera</button>
+    </div>
+
+    <pre id="result"></pre>
+
+    <script>
+        const video = document.getElementById('video');
+        const resultElement = document.getElementById('result');
+        const switchCameraButton = document.getElementById('switch-camera');
+        const socket = io('https://192.168.29.157:5000', {
+            transports: ['websocket', 'polling']
+        });
+
+        let localStream;
+        let isUsingBackCamera = true;
+
+        // Initialize camera with facing mode
+        function initCamera(facingMode = 'environment') {
+            navigator.mediaDevices.getUserMedia({ video: { facingMode: { exact: facingMode } } })
+                .then(stream => {
+                    video.srcObject = stream;
+                    localStream = stream;
+                })
+                .catch(error => console.error('Error accessing camera:', error));
+        }
+
+        // Switch between front and back camera
+        switchCameraButton.addEventListener('click', () => {
+            if (localStream) {
+                localStream.getTracks().forEach(track => track.stop());
+            }
+
+            isUsingBackCamera = !isUsingBackCamera;
+            const newFacingMode = isUsingBackCamera ? 'environment' : 'user';
+            switchCameraButton.textContent = isUsingBackCamera ? 'Switch to Front Camera' : 'Switch to Back Camera';
+
+            initCamera(newFacingMode);
+        });
+
+        // Initialize camera on page load with the back camera as default
+        initCamera('environment');
+
+        // Turn camera on and off
+        document.getElementById('toggle-camera').addEventListener('click', () => {
+            if (localStream) {
+                const tracks = localStream.getTracks();
+                tracks.forEach(track => track.stop());
+                video.srcObject = null;
+                localStream = null;
+                document.getElementById('toggle-camera').textContent = 'Turn Camera On';
+            } else {
+                initCamera(isUsingBackCamera ? 'environment' : 'user');
+                document.getElementById('toggle-camera').textContent = 'Turn Camera Off';
+            }
+        });
+
+        // Handle file drop and input
+        const dropZone = document.getElementById('drop-zone');
+        const fileInput = document.getElementById('file-input');
+
+        dropZone.addEventListener('click', () => fileInput.click());
+
+        dropZone.addEventListener('dragover', event => {
+            event.preventDefault();
+            dropZone.classList.add('hover');
+        });
+
+        dropZone.addEventListener('dragleave', () => {
+            dropZone.classList.remove('hover');
+        });
+
+        dropZone.addEventListener('drop', event => {
+            event.preventDefault();
+            dropZone.classList.remove('hover');
+            const file = event.dataTransfer.files[0];
+            handleFile(file);
+        });
+
+        fileInput.addEventListener('change', event => {
+            const file = event.target.files[0];
+            handleFile(file);
+        });
+        // Function to handle file input or drag-and-drop
+        function handleFile(file) {
+            const reader = new FileReader();
+            reader.onload = () => {
+                const base64Image = reader.result.split(',')[1];  // Make sure base64Image is correctly extracted
+                sendImage(base64Image);  // Pass the base64Image to sendImage function
+            };
+            reader.readAsDataURL(file);
+        }
+
+        // Capture image from camera and create base64 string
+        document.getElementById('capture').addEventListener('click', () => {
+            const canvas = document.createElement('canvas');
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+            const base64Image = canvas.toDataURL('image/jpeg').split(',')[1];  // Define base64Image properly here
+            sendImage(base64Image);  // Call sendImage function with the base64 string
+        });
+
+        // Function to send the image to Roboflow
+        function sendImage(base64Image) {
+            const task = document.getElementById('task').value;
+
+            if (task === 'brand') {
+                // Call Roboflow API
+                // PS: Had problems setting up the Roboflow API in the Backend, so here we are exposed to the API key
+                const roboflowApiKey = 'hEmDOq25p2OMqt1yHbTW'; // Replace with your private Roboflow API key
+                const roboflowModelEndpoint = 'https://detect.roboflow.com/brand-recignization-and-counting/2'; // Replace with your Roboflow model URL
+
+                const formData = new FormData();
+                
+                // Convert base64Image to Blob
+                const byteString = atob(base64Image);
+                const arrayBuffer = new ArrayBuffer(byteString.length);
+                const uintArray = new Uint8Array(arrayBuffer);
+
+                for (let i = 0; i < byteString.length; i++) {
+                    uintArray[i] = byteString.charCodeAt(i);
+                }
+
+                const blob = new Blob([arrayBuffer], { type: 'image/jpeg' });
+                formData.append('file', blob);  // Append the Blob to the form data
+
+                fetch(`${roboflowModelEndpoint}?api_key=${roboflowApiKey}`, {
+                    method: 'POST',
+                    body: formData  // Send the FormData object directly
+                })
+                .then(response => response.json())
+                .then(data => {
+                    resultElement.textContent = JSON.stringify(data, null, 2);  // Display the result
+                })
+                .catch(error => {
+                    resultElement.textContent = `Error: ${error.message}`;
+                });
+            } else {
+                // For other tasks (classify, ocr), use socket communication with the backend
+                socket.emit('message', { task: task, image: base64Image });
+            }
+        }
+
+        // Receive results from server
+        socket.on('message', data => {
+            resultElement.textContent = JSON.stringify(data, null, 2);
+        });
+
+        // Handle errors
+        socket.on('error', error => {
+            resultElement.textContent = `Error: ${error.message}`;
+        });
+    </script>
+</body>
+</html>
