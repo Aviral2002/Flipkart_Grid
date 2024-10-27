@@ -1,6 +1,7 @@
 # Flipkart Grid 2024
 
 This project provides a web application for detecting the freshness of fruits and vegetables, extracting product details using OCR, and recognizing brands with counting. It leverages a Convolutional Neural Network (CNN) for image classification, Tesseract OCR for text extraction, and Roboflow for brand recognition. Communication between the front-end and back-end is facilitated by WebSockets.
+
 Video Demo :: https://youtu.be/rdapySG5OB0?si=FxbVSFYDMD1X_BMB
 
 ## Main Features
